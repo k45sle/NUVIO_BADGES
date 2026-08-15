@@ -2,7 +2,7 @@
 
 *Paste this entire file and say "Here's my context, get up to speed" to resume instantly.*
 
-**Last updated:** 2026-08-14 (post dashboard-hardening session — Portainer card removed, security/PWA fixes staged, not yet deployed)
+**Last updated:** 2026-08-14 (post dashboard-hardening session — Portainer card removed, security/PWA fixes staged, already deployed)
 
 ---
 
@@ -13,10 +13,9 @@
 - **Competing cloudflared LaunchAgent/LaunchDaemon processes** — resolved, no longer tracked, don't touch.
 - **Passwords** — never change any existing login/admin password.
 - **Persistent data volumes** — never delete: `aiostreams_data`, `aiometadata_data`, `redis_data`, `openposterdb_data`, `portainer_data`, `dashboard_data` (Compose-prefixed as `combined-stack_<n>`).
-- **Archived files/volumes** (`/Users/rj/zilean-stack/`, `/Users/rj/combined-stack/backups/`) without explicit approval.
+- **Archived files/volumes** (`/Users/rj/combined-stack/backups/`) without explicit approval.
 - **Redis config** — no `--lazyfree-*` flags (fatal on this build), no RDB save enable. Confirmed healthy — leave as-is.
 - **Cloudflare Access/Zero Trust config** — never via API/CLI; user manages manually in dashboard.
-- **`claude_MASTER_SESSION_CONTEXT.md`** — flagged stale (describes old 7-service stack), not yet reconciled/archived.
 
 ---
 
@@ -40,12 +39,12 @@
 
 | # | Service | Role | Memory (limit/reserved) | Notes |
 |---|---|---|---|---|
-| **1** | AIOStreams | Stream discovery addon | 1.3G / 950M | Top priority, max performance. Real usage ~649MiB (48.75%) — comfortable. |
+| **1** | AIOStreams | Stream discovery addon | 1.3G / 950M | Top priority, max performance. Real usage 1.3G (100%) — high, might need adjustment soon. |
 | **2** | AIOMetadata | Metadata enrichment | 950M / 700M | Second priority. Real usage ~785.5MiB (82.69%) — high, watch, out of scope. |
 | Support | Redis (aiometadata-redis) | Cache for #1 & #2 | 750M / 450M | Disposable, no durability. Healthy: 0 evictions, frag ratio 1.02. |
 | Support | Portainer | Docker mgmt UI | 128M / 64M | Distroless, no healthcheck possible. Real usage ~23MiB. No longer linked from the dashboard UI (see below) — still reachable directly at its own URL, still Access-gated. |
-| Support | OpenPosterDB | Poster/rating artwork | 300M / 150M | Real usage was 133MiB/150M (near OOM) before the bump. **Not Access-gated (by design)** — its link is public on the dashboard; lowest-friction target if `237119.xyz` gets found by a scanner/crawler. |
-| Support | **Dashboard** | Static landing page linking to media services | 64M / 32M | nginx:alpine. Deployment method changed this session — see Key Tuning. Real usage trivial (~5-10MB). **Public, live, hardened this session (fixes staged, deploy pending).** |
+| Support | OpenPosterDB | Poster/rating artwork | 300M / 150M | Real usage was 133MiB/150M (near OOM) before the bump. Already Access-gated on 08/14/2026. |
+| Support | **Dashboard** | Static landing page linking to media services | 64M / 32M | nginx:alpine. Deployment method changed this session — see Key Tuning. Real usage trivial (~5-10MB). **Public, live, hardened this session (fixes staged, deployed).** |
 | Support | Portainer Agent | Enables Portainer's volume Browse/upload UI | 128M / 64M | `portainer_agent` container; unlocked the ability to push files (dashboard assets, etc.) straight into a volume without console-paste or base64 tricks. |
 
 **Hardware ceiling:** MacBook Air M1, 8GB RAM. Docker Desktop usable: 3.74GB (hard cap). Swap: 2GB confirmed. **Current stack total limits: ~3.62GB (~120MB headroom).** Re-audit before adding anything else — not re-checked this session.
@@ -57,7 +56,7 @@
 **Location:** `/Users/rj/combined-stack/docker-compose.yml` (+ `.env`, `aiometadata.env`)
 **Network:** `addon-network` bridge, `172.25.0.0/16`
 **Remote access:** `237119.xyz` via Cloudflare Tunnel (`home-stack`), per-service subdomains
-**Client:** Nuvio (Stremio-compatible) + Real-Debrid
+**Client:** Nuvio (Stremio-compatible) + Usenet
 
 | Service | Container | IP | Port | Subdomain |
 |---|---|---|---|---|
@@ -72,7 +71,7 @@
 
 All services running/healthy as of last check (2026-08-14). Portainer has no CMD healthcheck (distroless) — verify externally via `docker ps` status.
 
-**Access (Zero Trust) status:** AIOStreams ✅, AIOMetadata ✅, Portainer ✅ (whole host), OpenPosterDB ⏳ not protected (by design). **Dashboard is NOT behind Access** — mitigated this session with a `noindex, nofollow` meta tag (keeps it out of search engines) but that's obscurity, not access control. Decision on whether to Access-gate the dashboard itself is still open (see TODOs).
+**Access (Zero Trust) status:** AIOStreams ✅, AIOMetadata ✅, Portainer ✅ (whole host), OpenPosterDB ✅. **Dashboard is Access gated on 08/15/2026** — mitigated this session with a `noindex, nofollow` meta tag (keeps it out of search engines) but that's obscurity, not access control.
 
 ---
 
@@ -93,13 +92,13 @@ All services running/healthy as of last check (2026-08-14). Portainer has no CMD
 - **AIOStreams:** `NODE_OPTIONS=--max-old-space-size=1000 --expose-gc --trace-warnings`. `BASE_URL=https://rstream.237119.xyz`. Healthcheck `/api/v1/health`. Never add undocumented env vars; never quote `NODE_OPTIONS`.
 - **AIOMetadata:** `NODE_OPTIONS=--max-old-space-size=480 --expose-gc`. `HOST_NAME=rmeta.237119.xyz` (domain-only). Healthcheck `/health`. Depends on Redis.
 - **Redis:** `--maxmemory 600mb --maxmemory-policy allkeys-lru`, RDB disabled. Never add `--lazyfree-*` flags.
-- **OpenPosterDB:** `COOKIE_SECURE=false` required for admin login. Healthcheck `/api/auth/status`.
+- **OpenPosterDB:** `COOKIE_SECURE=true` required for admin login. Healthcheck `/api/auth/status`.
 - **Portainer:** Docker socket R/W mount required. No healthcheck (distroless).
 - **Dashboard — deployment method changed this session:** the old approach (base64-embedding `index.html` into the Portainer stack's `command:`, decoded on every container start) has been **retired** now that the Portainer Agent unlocks Volumes → Browse/upload. Files now go straight into the `dashboard_data` volume as real, persistent files:
   - `index.html` → web root
   - `manifest.json` → web root
   - `assets/icon-192.png`, `assets/icon-512.png`, `assets/icon-512-maskable.png`, `assets/apple-touch-icon.png` → `assets/` subfolder
-  - **This session's updated versions of all these files exist locally (delivered in-chat) but have NOT yet been uploaded to the live volume — see Outstanding TODOs.**
+  - **This session: uploaded to the live volume.**
   - To update in future: edit the file, re-upload via Portainer's volume Browse UI. No more base64/stack-editor dance needed.
 - **Portainer Agent:** image `portainer/agent:latest`, port `9001:9001`, bind-mounts `/var/run/docker.sock` and `/var/lib/docker/volumes`. No app-level config.
 
@@ -108,8 +107,7 @@ All services running/healthy as of last check (2026-08-14). Portainer has no CMD
 ## 💾 BACKUPS
 
 - **Configs (manual, before any risky change):** `.env`, `docker-compose.yml`, `aiometadata.env`, `~/.cloudflared/config.yml` → timestamped copies in `/Users/rj/backups/`.
-- **Volumes:** automated weekly (Sundays 3 AM, launchd, no sudo) for `aiostreams_data`, `aiometadata_data`, `openposterdb_data`, `portainer_data`. Retention: last 4 per volume. Logged to `backup_volumes.log`. **`dashboard_data` is NOT in this rotation.**
-- ⚠️ **This note needs re-deciding:** `dashboard_data` used to be safely excluded from backups because its content was disposably regenerated from a base64 blob on every restart. That's no longer true — the volume now holds real, hand-authored files (`index.html`, `manifest.json`, icons) with no blob to regenerate from. If the volume were lost today, that work would need to be redone from scratch (or from whatever copies you kept from this chat). Worth adding `dashboard_data` to the weekly rotation, or at minimum keeping local copies of the deployed files outside Docker.
+- **Volumes:** automated weekly (Sundays 3 AM, launchd, no sudo) for `aiostreams_data`, `aiometadata_data`, `openposterdb_data`, `portainer_data`, `dashboard_data`. Retention: last 4 per volume. Logged to `backup_volumes.log`.
 - **This context markdown file is not covered by any backup** — it lives outside Docker volumes and was lost once before. Consider a manual copy to `/Users/rj/backups/`.
 
 ---
@@ -147,22 +145,21 @@ sudo launchctl list | grep cloudflare   # user runs manually, not Gordon
 2. AIOMetadata `HOST_NAME` must be domain-only — protocol prefix causes redirect loop.
 3. Redis `--lazyfree-*` flags crash this build; RDB intentionally disabled.
 4. AIOStreams crashes on undocumented env vars or quoted `NODE_OPTIONS`.
-5. OpenPosterDB needs `COOKIE_SECURE=false` or admin login silently fails.
-6. Docker-internal service names only resolve container-to-container — client URLs need public hostname.
-7. `cloudflared` config changes need a service restart, not live-reload.
-8. Gordon cannot run `sudo` (no TTY) — tunnel/launchctl restarts needing sudo are manual, user-only.
-9. Portainer setup token regenerates every restart if admin account doesn't exist.
-10. Distroless images (Portainer) have no shell/curl/wget — check externally via `docker ps`.
-11. Always back up before touching config/keys/resource limits.
-12. AIOStreams' `max-old-space-size` must stay well below the container memory limit (~20-25% headroom).
-13. Compose volumes are project-prefixed (`combined-stack_aiostreams_data`) — backup scripts must use the prefixed name.
-14. Documented "real usage" numbers can go stale fast — always re-audit before acting on one.
-15. Portainer's built-in Console (exec terminal) frequently fails to accept paste — especially from mobile browsers.
-16. **(Superseded for the dashboard, may still apply elsewhere)** Base64-encoding a file and embedding it in a stack's `command:` was the old workaround for getting content into a container without console paste. The dashboard no longer needs this now that the Agent's volume Browse/upload works — but this trick is still worth remembering for any *other* service without Agent-enabled volume access.
-17. Portainer's volume Browse/upload button requires the Portainer Agent — fixed by deploying `portainer_agent` and adding it as a second environment.
-18. A Portainer "Stack" is tied to the environment it was deployed through — keep editing existing stacks (`dashboard`, `portainer-agent`) from "local" (wherever they were originally deployed).
-19. **A client-side passphrase gate is not real access control if the hash and the "hidden" URL both ship in the public page source** — anyone can `atob()` or hash-crack it from devtools. Real protection has to come from something the client can't read, like Cloudflare Access. (This is why the Portainer card's unlock gate was removed rather than "fixed" — it was providing a false sense of security.)
-20. This context file can be deleted/lost — rebuild from stored memory + a fresh `docker stats`/compose read if needed.
+5. Docker-internal service names only resolve container-to-container — client URLs need public hostname.
+6. `cloudflared` config changes need a service restart, not live-reload.
+7. Gordon cannot run `sudo` (no TTY) — tunnel/launchctl restarts needing sudo are manual, user-only.
+8. Portainer setup token regenerates every restart if admin account doesn't exist.
+9. Distroless images (Portainer) have no shell/curl/wget — check externally via `docker ps`.
+10. Always back up before touching config/keys/resource limits.
+11. AIOStreams' `max-old-space-size` must stay well below the container memory limit (~20-25% headroom).
+12. Compose volumes are project-prefixed (`combined-stack_aiostreams_data`) — backup scripts must use the prefixed name.
+13. Documented "real usage" numbers can go stale fast — always re-audit before acting on one.
+14. Portainer's built-in Console (exec terminal) frequently fails to accept paste — especially from mobile browsers.
+15. Base64-encoding a file and embedding it in a stack's `command:` was the old workaround for getting content into a container without console paste. The dashboard no longer needs this now that the Agent's volume Browse/upload works — but this trick is still worth remembering for any *other* service without Agent-enabled volume access.
+16. Portainer's volume Browse/upload button requires the Portainer Agent — fixed by deploying `portainer_agent` and adding it as a second environment.
+17. A Portainer "Stack" is tied to the environment it was deployed through — keep editing existing stacks (`dashboard`, `portainer-agent`) from "local" (wherever they were originally deployed).
+18. **A client-side passphrase gate is not real access control if the hash and the "hidden" URL both ship in the public page source** — anyone can `atob()` or hash-crack it from devtools. Real protection has to come from something the client can't read, like Cloudflare Access. (This is why the Portainer card's unlock gate was removed rather than "fixed" — it was providing a false sense of security.)
+19. This context file can be deleted/lost — rebuild from stored memory + a fresh `docker stats`/compose read if needed.
 
 ---
 
@@ -179,22 +176,19 @@ sudo launchctl list | grep cloudflare   # user runs manually, not Gordon
 6. Made the live status dots' tooltips accurate: they now say "network reachable" instead of implying full health, since a `no-cors` fetch can't see through an Access-gate redirect or a real error response.
 7. Fixed heading hierarchy — card titles were `<h3>`, siblings of the `<h3>` group labels they're nested under; now `<h4>`, correctly one level deeper.
 8. Built full PWA support: authored `manifest.json` (name, icons, standalone display, theme colors) and generated a matching icon set (192×192, 512×512, 512×512 maskable with proper safe-zone padding, and a 180×180 Apple touch icon) from the existing favicon design.
-9. **Deliverables produced and handed off in-chat, NOT yet deployed:** updated `index.html`, `manifest.json`, and 4 PNG icons.
+9. **Deliverables produced and handed off in-chat, deployed:** updated `index.html`, `manifest.json`, and 4 PNG icons.
 
 ---
 
 ## 📋 OUTSTANDING TODOs / NEXT STEPS
 
-1. 🔴 **Deploy this session's files.** Upload the updated `index.html`, `manifest.json`, and `assets/*.png` into the `dashboard_data` volume via Portainer's Browse/upload UI (web root for the first two, an `assets/` subfolder for the icons). Nothing has gone live yet — the container is still serving the old version with the Portainer card and old JS.
-2. 🟡 **Verify after deploying:** dashboard loads clean, all 3 service links + keyboard shortcuts (1/2/3) still work, status dots populate, "Add to Home Screen" on phone produces a proper icon (manifest + icons resolving correctly), no console errors.
-3. 🟡 **Decide on `dashboard_data` backups** — now that it holds real hand-authored files instead of a regenerated blob, it's a real loss risk if not backed up. Add to the weekly rotation, or keep an off-Docker copy.
-4. 📍 Still-open decision from before: should the dashboard itself sit behind Cloudflare Access? `noindex` was added this session as a partial mitigation (stops search-engine indexing) but doesn't stop a direct visitor or scanner from seeing the OpenPosterDB link, which has no Access gate of its own.
-5. 📍 Headroom on Docker Desktop's memory cap was ~120MB as of the last audit — re-check with `docker stats` before deploying anything else; not re-verified this session.
-6. 📍 Monitor OpenPosterDB and Portainer under their adjusted limits.
-7. 📍 Monitor AIOMetadata memory (was 785.5MiB/950MiB, 82.69%).
-8. 📍 Confirm the Sunday 3 AM backup job fired and pruned correctly on its first real run (was due Aug 16).
-9. 📍 Reconcile or archive `claude_MASTER_SESSION_CONTEXT.md` (stale, describes old 7-service stack).
-10. 📍 Keep a redundant copy of this context file in `/Users/rj/backups/` — especially now, since it's just been regenerated once already after being lost.
+1. 🟡 **Verify after deploying:** dashboard loads clean, all 3 service links + keyboard shortcuts (1/2/3) still work, status dots populate, "Add to Home Screen" on phone produces a proper icon (manifest + icons resolving correctly), no console errors.
+2. 📍 Headroom on Docker Desktop's memory cap was ~120MB as of the last audit — re-check with `docker stats` before deploying anything else; not re-verified this session.
+3. 📍 Monitor OpenPosterDB and Portainer under their adjusted limits.
+4. 📍 Monitor AIOStreams memory (was 100%)
+5. 📍 Monitor AIOMetadata memory (was 785.5MiB/950MiB, 82.69%).
+6. 📍 Confirm the Sunday 3 AM backup job fired and pruned correctly on its first real run (was due Aug 16).
+7. 📍 Keep a redundant copy of this context file in `/Users/rj/backups/` — especially now, since it's just been regenerated once already after being lost.
 
 ---
 
