@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="description" content="A self-hosted home media infrastructure dashboard linking to media services.">
+  <meta name="theme-color" content="#140a12" id="theme-color-meta">
+  <meta name="robots" content="noindex, nofollow">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
+  <title>RJJ Home Media Dashboard</title>
+
+  <!-- Inline SVG Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23140a12'/><rect x='20' y='20' width='25' height='25' rx='6' fill='%23ec4899'/><rect x='55' y='20' width='25' height='25' rx='6' fill='%23ec4899'/><rect x='20' y='55' width='25' height='25' rx='6' fill='%23ec4899'/><rect x='55' y='55' width='25' height='25' rx='6' fill='%23f472b6'/></svg>">
+
+  <!-- Early Theme Detection Script (FOUC Prevention) -->
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    })();
+  </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@1.31.0/dist/umd/lucide.js" defer></script>
+
+  <style>
+    /* CSS Variables for Dark / Light Themes (Sakura Pink Palette) */
+    :root[data-theme="dark"] {
+      --bg-color: #140a12;
+      --bg-gradient: radial-gradient(circle at 50% 0%, #2e1224 0%, #140a12 80%);
+      --card-bg: rgba(38, 18, 32, 0.65);
+      --card-hover-bg: rgba(56, 24, 46, 0.85);
+      --card-border: rgba(244, 114, 182, 0.15);
+      --card-hover-border: rgba(244, 114, 182, 0.5);
+      --text-main: #fdf2f8;
+      --text-muted: #f4a8c4;
+      --accent: #ec4899;
+      --accent-glow: rgba(236, 72, 153, 0.25);
+      --icon-bg: rgba(244, 114, 182, 0.15);
+      --icon-color: #f472b6;
+      --header-bg: rgba(30, 13, 25, 0.5);
+      --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+      --status-ring: #140a12;
+    }
+
+    :root[data-theme="light"] {
+      --bg-color: #fff5f7;
+      --bg-gradient: radial-gradient(circle at 50% 0%, #fce7f3 0%, #fff5f7 80%);
+      --card-bg: rgba(255, 255, 255, 0.75);
+      --card-hover-bg: #ffffff;
+      --card-border: rgba(251, 207, 232, 0.8);
+      --card-hover-border: rgba(236, 72, 153, 0.4);
+      --text-main: #4c0519;
+      --text-muted: #9d4b68;
+      --accent: #db2777;
+      --accent-glow: rgba(219, 39, 119, 0.15);
+      --icon-bg: rgba(219, 39, 119, 0.1);
+      --icon-color: #db2777;
+      --header-bg: rgba(255, 255, 255, 0.5);
+      --shadow: 0 10px 30px -10px rgba(219, 39, 119, 0.08);
+      --status-ring: #fff5f7;
+    }
+
+    /* Reset & Base Styles */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-color);
+      background-image: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1.5rem;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      position: relative;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Canvas for Sakura Petals Animation */
+    #sakura-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Container */
+    .container {
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Top Navigation Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3.5rem;
+      padding: 0.85rem 1.25rem;
+      background: var(--header-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--icon-bg);
+      color: var(--icon-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .brand-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .brand-text h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .brand-text p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    /* Clock Widget */
+    .clock-widget {
+      text-align: right;
+    }
+
+    .time {
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+    }
+
+    .date {
+      font-size: 0.725rem;
+      color: var(--text-muted);
+    }
+
+    /* Theme Toggle Button */
+    .theme-toggle {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+
+    .theme-toggle:hover, .theme-toggle:active {
+      background: var(--icon-bg);
+      color: var(--icon-color);
+      border-color: var(--card-hover-border);
+    }
+
+    /* Hero / Header Section */
+    .hero {
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.35rem;
+    }
+
+    .hero p {
+      color: var(--text-muted);
+      font-size: 0.925rem;
+    }
+
+    /* Group Labels */
+    .group-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin: 2rem 0 0.85rem;
+    }
+
+    .group-label:first-of-type {
+      margin-top: 0.5rem;
+    }
+
+    /* Service Cards Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* Card Styling */
+    .card {
+      text-decoration: none;
+      color: inherit;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 0.25s ease,
+                  box-shadow 0.25s ease,
+                  background-color 0.25s ease,
+                  opacity 0.25s ease;
+      box-shadow: var(--shadow);
+      animation: cardIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: calc(var(--i, 0) * 70ms);
+      touch-action: manipulation;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card:hover, .card:active {
+      transform: translateY(-3px);
+      border-color: var(--card-hover-border);
+      background: var(--card-hover-bg);
+      box-shadow: 0 16px 32px -10px var(--accent-glow);
+    }
+
+    .card:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-top-right {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .kbd-hint {
+      font-size: 0.65rem;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+      border-radius: 5px;
+      padding: 1px 6px;
+      opacity: 0.6;
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--icon-bg);
+      color: var(--icon-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: transform 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .card:hover .card-icon {
+      transform: scale(1.05);
+    }
+
+    /* Live status dot */
+    .status-dot {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--status-ring);
+      background: #94a3b8;
+    }
+
+    .status-dot[data-status="checking"] {
+      background: #94a3b8;
+      animation: statusPulse 1.4s ease-in-out infinite;
+    }
+
+    .status-dot[data-status="up"] {
+      background: #22c55e;
+    }
+
+    .status-dot[data-status="down"] {
+      background: #ef4444;
+    }
+
+    @keyframes statusPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    .external-link-icon {
+      color: var(--text-muted);
+      opacity: 0.4;
+      transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease;
+    }
+
+    .card:hover .external-link-icon {
+      opacity: 1;
+      transform: translate(2px, -2px);
+      color: var(--accent);
+    }
+
+    .card-content h4 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.01em;
+    }
+
+    .card-content p {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* Footer */
+    .site-footer {
+      margin-top: 3rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .site-footer .footer-note {
+      margin-top: 0.35rem;
+      opacity: 0.6;
+      font-size: 0.7rem;
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .card {
+        animation: none;
+      }
+      .status-dot[data-status="checking"] {
+        animation: none;
+      }
+      #sakura-canvas {
+        display: none;
+      }
+    }
+
+    /* Mobile Responsive Adjustments */
+    @media (max-width: 640px) {
+      body {
+        padding: 1rem 0.85rem;
+      }
+      header {
+        margin-bottom: 1.75rem;
+        padding: 0.75rem 1rem;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      .card {
+        padding: 1.25rem;
+      }
+      .clock-widget,
+      .kbd-hint {
+        display: none;
+      }
+      .hero h2 {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Falling Sakura Petals Canvas -->
+  <canvas id="sakura-canvas"></canvas>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-icon">
+          <img class="brand-logo" src="https://i.postimg.cc/43xmDctx/ezgif-com-resize.gif" alt="RJJ Home Media logo">
+        </div>
+        <div class="brand-text">
+          <h1>RJJ Home</h1>
+          <p>Media Infrastructure</p>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="clock-widget">
+          <div class="time" id="clock-time">--:-- --</div>
+          <div class="date" id="clock-date">---, --- --</div>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark/light mode" aria-pressed="true">
+          <i data-lucide="moon" id="theme-icon" size="18" aria-hidden="true"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Subtitle / Hero -->
+    <div class="hero">
+      <h2>Services</h2>
+      <p>Direct access to active network endpoints and management applications.</p>
+    </div>
+
+    <!-- Media Services -->
+    <h3 class="group-label">Media Services</h3>
+    <div class="grid">
+
+      <!-- Card 1: AIOStreams -->
+      <a class="card" href="https://rstream.237119.xyz" target="_blank" rel="noopener noreferrer" style="--i:0" data-key="1" aria-label="Open AIOStreams (opens in new tab)">
+        <div class="card-top">
+          <div class="card-icon">
+            <i data-lucide="play-square" size="22" aria-hidden="true"></i>
+            <span class="status-dot" data-status="checking" title="Checking status…"></span>
+          </div>
+          <div class="card-top-right">
+            <span class="kbd-hint" aria-hidden="true">1</span>
+            <i data-lucide="arrow-up-right" class="external-link-icon" size="20" aria-hidden="true"></i>
+          </div>
+        </div>
+        <div class="card-content">
+          <h4>AIOStreams</h4>
+          <p>Stream discovery addon and media routing service.</p>
+        </div>
+      </a>
+
+      <!-- Card 2: AIOMetadata -->
+      <a class="card" href="https://rmeta.237119.xyz" target="_blank" rel="noopener noreferrer" style="--i:1" data-key="2" aria-label="Open AIOMetadata (opens in new tab)">
+        <div class="card-top">
+          <div class="card-icon">
+            <i data-lucide="sparkles" size="22" aria-hidden="true"></i>
+            <span class="status-dot" data-status="checking" title="Checking status…"></span>
+          </div>
+          <div class="card-top-right">
+            <span class="kbd-hint" aria-hidden="true">2</span>
+            <i data-lucide="arrow-up-right" class="external-link-icon" size="20" aria-hidden="true"></i>
+          </div>
+        </div>
+        <div class="card-content">
+          <h4>AIOMetadata</h4>
+          <p>Metadata enrichment engine for library indexing.</p>
+        </div>
+      </a>
+
+      <!-- Card 3: OpenPosterDB -->
+      <a class="card" href="https://rposter.237119.xyz" target="_blank" rel="noopener noreferrer" style="--i:2" data-key="3" aria-label="Open OpenPosterDB (opens in new tab)">
+        <div class="card-top">
+          <div class="card-icon">
+            <i data-lucide="image" size="22" aria-hidden="true"></i>
+            <span class="status-dot" data-status="checking" title="Checking status…"></span>
+          </div>
+          <div class="card-top-right">
+            <span class="kbd-hint" aria-hidden="true">3</span>
+            <i data-lucide="arrow-up-right" class="external-link-icon" size="20" aria-hidden="true"></i>
+          </div>
+        </div>
+        <div class="card-content">
+          <h4>OpenPosterDB</h4>
+          <p>Poster and rating artwork distribution database.</p>
+        </div>
+      </a>
+
+    </div>
+
+    <footer class="site-footer">
+      <p>Dashboard last updated <span id="last-updated">—</span></p>
+      <p class="footer-note">Status dots reflect network reachability, not full service health.</p>
+    </footer>
+  </div>
+
+  <script>
+    // ---------- Sakura Flower Petals Canvas Animation ----------
+    (function setupSakura() {
+      function startAnimation() {
+        const canvas = document.getElementById('sakura-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        let dpr = window.devicePixelRatio || 1;
+
+        function resize() {
+          dpr = window.devicePixelRatio || 1;
+          const width = window.innerWidth || document.documentElement.clientWidth;
+          const height = window.innerHeight || document.documentElement.clientHeight;
+          canvas.width = width * dpr;
+          canvas.height = height * dpr;
+          ctx.scale(dpr, dpr);
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        // Reduce petal count slightly on small mobile screens for performance
+        const isMobile = window.innerWidth < 640;
+        const petalCount = isMobile ? 25 : 40;
+        const petals = [];
+
+        class Petal {
+          constructor() {
+            this.reset();
+          }
+
+          reset() {
+            const w = window.innerWidth || document.documentElement.clientWidth;
+            const h = window.innerHeight || document.documentElement.clientHeight;
+            this.x = Math.random() * w;
+            this.y = Math.random() * h - h;
+            this.size = Math.random() * 7 + 5;
+            this.speedY = Math.random() * 1 + 0.7;
+            this.speedX = Math.random() * 0.6 - 0.3;
+            this.rotation = Math.random() * 360;
+            this.rotationSpeed = Math.random() * 1.5 - 0.75;
+            this.opacity = Math.random() * 0.45 + 0.35;
+            this.swing = Math.random() * 2;
+            this.swingSpeed = Math.random() * 0.02 + 0.01;
+          }
+
+          update() {
+            this.y += this.speedY;
+            this.swing += this.swingSpeed;
+            this.x += Math.sin(this.swing) + this.speedX;
+            this.rotation += this.rotationSpeed;
+
+            const w = window.innerWidth || document.documentElement.clientWidth;
+            const h = window.innerHeight || document.documentElement.clientHeight;
+
+            if (this.y > h + 20 || this.x < -20 || this.x > w + 20) {
+              this.reset();
+              this.y = -10;
+            }
+          }
+
+          draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate((this.rotation * Math.PI) / 180);
+            ctx.globalAlpha = this.opacity;
+
+            ctx.fillStyle = '#f472b6';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(-this.size, -this.size / 2, -this.size, this.size, 0, this.size * 1.5);
+            ctx.bezierCurveTo(this.size, this.size, this.size, -this.size / 2, 0, 0);
+            ctx.fill();
+
+            ctx.restore();
+          }
+        }
+
+        const initialH = window.innerHeight || document.documentElement.clientHeight;
+        for (let i = 0; i < petalCount; i++) {
+          const p = new Petal();
+          p.y = Math.random() * initialH;
+          petals.push(p);
+        }
+
+        function animate() {
+          const w = window.innerWidth || document.documentElement.clientWidth;
+          const h = window.innerHeight || document.documentElement.clientHeight;
+          ctx.clearRect(0, 0, w, h);
+          petals.forEach((petal) => {
+            petal.update();
+            petal.draw();
+          });
+          requestAnimationFrame(animate);
+        }
+
+        animate();
+      }
+
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', startAnimation);
+      } else {
+        startAnimation();
+      }
+    })();
+
+    // ---------- Safe Lucide Icon Initialization Helper ----------
+    function safeRenderIcons() {
+      if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+        try {
+          lucide.createIcons();
+        } catch (err) {
+          console.warn('Lucide icons failed to initialize:', err);
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+      // ---------- Clock ----------
+      function updateClock() {
+        const clockTime = document.getElementById('clock-time');
+        const clockDate = document.getElementById('clock-date');
+        if (!clockTime || !clockDate) return;
+        const now = new Date();
+        clockTime.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        clockDate.textContent = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+      }
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      // ---------- Theme Toggle ----------
+      const toggleBtn = document.getElementById('theme-toggle');
+      const themeIcon = document.getElementById('theme-icon');
+      const themeColorMeta = document.getElementById('theme-color-meta');
+      const htmlElement = document.documentElement;
+
+      function setTheme(theme) {
+        htmlElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+
+        if (toggleBtn) toggleBtn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+        if (themeIcon) themeIcon.setAttribute('data-lucide', theme === 'dark' ? 'sun' : 'moon');
+        if (themeColorMeta) themeColorMeta.setAttribute('content', theme === 'dark' ? '#140a12' : '#fff5f7');
+
+        safeRenderIcons();
+      }
+
+      const currentTheme = htmlElement.getAttribute('data-theme') || 'dark';
+      setTheme(currentTheme);
+
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          const theme = htmlElement.getAttribute('data-theme');
+          setTheme(theme === 'dark' ? 'light' : 'dark');
+        });
+      }
+
+      // ---------- Number-key shortcuts (cards are real <a href> now, so the
+      // browser already handles click/Enter natively — this just adds the
+      // "press 1/2/3" convenience on top) ----------
+      document.addEventListener('keydown', (e) => {
+        const tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        const card = document.querySelector(`.card[data-key="${e.key}"]`);
+        if (card) card.click();
+      });
+
+      // ---------- Live status dots ----------
+      // Note: this uses a no-cors fetch, which can only tell us whether the
+      // network request completed at all — it can't see the HTTP status code.
+      // A service behind Cloudflare Access will show "up" even for a visitor
+      // who'd actually get bounced to a login page, and a real 500 error
+      // would also show "up". Treat this as a network-reachability signal,
+      // not a full health check (see the footer note in the UI).
+      async function checkStatus(card) {
+        const dot = card.querySelector('.status-dot');
+        const url = card.getAttribute('href');
+        if (!dot || !url) return;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        try {
+          await fetch(url, { mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+          dot.dataset.status = 'up';
+          dot.title = 'Responding (network reachable)';
+        } catch (err) {
+          dot.dataset.status = 'down';
+          dot.title = 'Unreachable — network, DNS, or connection failed';
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+      function checkAllStatuses() {
+        document.querySelectorAll('.card[href]').forEach(checkStatus);
+      }
+      checkAllStatuses();
+      setInterval(checkAllStatuses, 45000);
+
+      // ---------- Last updated footer ----------
+      // Deliberately NOT derived from document.lastModified: since this
+      // dashboard is redeployed by restarting the container, the file's
+      // mtime resets on every restart even when nothing actually changed.
+      // Bump DASHBOARD_UPDATED by hand whenever you redeploy real changes.
+      const DASHBOARD_UPDATED = '2026-08-14';
+      const lastUpdatedEl = document.getElementById('last-updated');
+      if (lastUpdatedEl) {
+        const d = new Date(DASHBOARD_UPDATED + 'T00:00:00');
+        lastUpdatedEl.textContent = isNaN(d.getTime())
+          ? 'unknown'
+          : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      }
+    }
+  </script>
+</body>
+</html>
