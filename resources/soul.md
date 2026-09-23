@@ -73,7 +73,7 @@ Use the primary Codex agent as the **planner, architect, investigator, and orche
 
 ### Primary agent
 
-- Run on **GPT-5.6 Sol High** whenever model/reasoning selection is available.
+- Run on **GPT-6 Sol High** whenever model/reasoning selection is available.
 - Own the task end-to-end.
 - Inspect the repository and relevant files.
 - Understand the request and constraints.
@@ -100,8 +100,8 @@ Delegate actual implementation to **newly created subagents**.
 
 Use:
 
-- **GPT-5.6 Luna Max** for normal implementation work.
-- **GPT-5.6 Luna Ultra** when the task is unusually difficult, cross-cutting, subtle, failure-prone, or when a Max attempt does not produce a reliable result.
+- **GPT-6 Luna Medium/High** for normal implementation work.
+- **GPT-6 Luna Max** when the task is unusually difficult, cross-cutting, subtle, failure-prone, or when a Max attempt does not produce a reliable result.
 
 Implementation agents should perform the actual:
 
@@ -157,7 +157,7 @@ After the implementation is complete and normal validation has succeeded, **alwa
 
 Use:
 
-- **GPT-5.6 Sol Medium**
+- **GPT-6 Sol Medium**
 
 This reviewer must inspect the resulting implementation directly rather than relying only on summaries from the primary agent or implementation agents.
 
@@ -200,9 +200,9 @@ The review agent should primarily **audit and report**, not silently replace lar
 If the final quality pass finds blocking issues or worthwhile fixes:
 
 1. Evaluate the findings.
-2. Delegate fixes to a GPT-5.6 Luna Max or Luna Ultra implementation agent.
+2. Delegate fixes to a GPT-6 Luna Medium/High or Luna Max implementation agent.
 3. Re-run relevant validation.
-4. Run another GPT-5.6 Sol Medium quality pass when the fixes are substantive.
+4. Run another GPT-6 Sol Medium quality pass when the fixes are substantive.
 
 Repeat until no known blocking issues remain.
 
@@ -219,13 +219,13 @@ Do not consider the task complete until:
 - the requested behavior is implemented,
 - delegated work has been integrated,
 - relevant validation has passed,
-- the independent GPT-5.6 Sol Medium quality pass has completed,
+- the independent GPT-6 Sol Medium quality pass has completed,
 - and any blocking findings have been resolved.
 
 The intended division of labor is:
 
-**GPT-5.6 Sol High:** think, plan, investigate, orchestrate, review, integrate.
+**GPT-6 Sol High:** think, plan, investigate, orchestrate, review, integrate.
 
-**GPT-5.6 Luna Max/Ultra:** write and edit the implementation.
+**GPT-6 Luna Medium/High/Max:** write and edit the implementation.
 
-**GPT-5.6 Sol Medium:** independently audit the finished work.
+**GPT-6 Sol Medium:** independently audit the finished work.
